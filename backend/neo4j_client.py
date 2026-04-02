@@ -19,27 +19,34 @@ class Neo4jClient:
     # ------------------------------------------------------------------
     def find_warm_path(self, user_id: str, target_id: str) -> dict:
         """
-        Returns the shortest path from user to target through CONNECTED_TO
-        or COLLABORATED_WITH edges, with trust scores.
+        Returns structured path from user to target with relationship metadata.
         """
         query = """
         MATCH path = shortestPath(
             (a:Person {id: $user_id})-[:CONNECTED_TO|COLLABORATED_WITH*..5]-(b:Person {id: $target_id})
         )
-        WITH path,
-             [n IN nodes(path) | {id: n.id, name: n.name, role: n.role, company: n.company}] AS people,
-             [r IN relationships(path) | {type: type(r), trust: coalesce(r.trust, 0.5)}] AS edges
-        RETURN people, edges, length(path) AS hops
+        RETURN 
+            [n IN nodes(path) | {id: n.id, name: n.name, role: n.role}] AS nodes,
+            [r IN relationships(path) | {type: type(r), trust: coalesce(r.trust, 1.0), context: coalesce(r.project, r.context)}] AS edges,
+            length(path) AS hops
         """
         with self.driver.session() as session:
             result = session.run(query, user_id=user_id, target_id=target_id)
             record = result.single()
             if not record:
-                return {"path": [], "edges": [], "hops": -1}
+                return {"nodes": [], "edges": [], "hops": -1, "strength_score": 0.0}
+            
+            # Calculate strength: product of trust scores along the path
+            edges = record["edges"]
+            strength = 1.0
+            for e in edges:
+                strength *= e.get("trust", 1.0)
+
             return {
-                "path": record["people"],
-                "edges": record["edges"],
+                "nodes": record["nodes"],
+                "edges": edges,
                 "hops": record["hops"],
+                "strength_score": round(strength, 2)
             }
 
     # ------------------------------------------------------------------
@@ -103,7 +110,7 @@ class Neo4jClient:
             for interest in data.get("shared_interests", []):
                 if interest.get("name"):
                     rarity = interest.get("rarity", 0.5)
-                    points = int(rarity * 30)  # rarer = higher score
+                    points = int(rarity * 35)  # rarer = higher score
                     score += points
                     reasons.append(f"Both interested in {interest['name']}")
 
@@ -112,19 +119,22 @@ class Neo4jClient:
                     score += 15
                     reasons.append(f"Both attended {event}")
 
+            complementarity_found = False
             for item in data.get("b_can_help_a", []):
                 if item:
-                    score += 20
+                    score += 30
                     reasons.append(f"They can help you with: {item}")
+                    complementarity_found = True
 
             for item in data.get("a_can_help_b", []):
                 if item:
-                    score += 20
+                    score += 30
                     reasons.append(f"You can help them with: {item}")
+                    complementarity_found = True
 
             for uni in data.get("shared_universities", []):
                 if uni:
-                    score += 10
+                    score += 15
                     reasons.append(f"Both went to {uni}")
 
             for comm in data.get("shared_communities", []):
@@ -132,42 +142,48 @@ class Neo4jClient:
                     score += 12
                     reasons.append(f"Both in {comm} community")
 
-            return {"score": min(score, 100), "reasons": reasons}
+            return {
+                "score": min(score, 100), 
+                "reasons": reasons, 
+                "primary_reason": reasons[0] if reasons else "No obvious overlap found",
+                "complementarity_found": complementarity_found
+            }
 
     # ------------------------------------------------------------------
     # 3. TRIANGULAR MATCH — 3-way ask/offer loops
     # ------------------------------------------------------------------
     def find_triangular_matches(self, user_id: str, max_size: int = 3) -> list:
         """
-        Finds micro-circles where A needs what B offers, B needs what C offers,
-        and C needs what A offers (or similar partial loops).
+        Finds 3-person cycles where needs are met in a loop: A -> B -> C -> A.
         """
         query = """
-        MATCH (a:Person {id: $user_id})-[:ASKS_FOR]->(need1)
-        MATCH (b:Person)-[:OFFERS]->(offer1)
-        WHERE offer1.name = need1.name AND b.id <> a.id
-
-        MATCH (b)-[:ASKS_FOR]->(need2)
-        MATCH (c:Person)-[:OFFERS]->(offer2)
-        WHERE offer2.name = need2.name AND c.id <> a.id AND c.id <> b.id
-
-        // Bonus: check if C also needs something A offers
-        OPTIONAL MATCH (c)-[:ASKS_FOR]->(need3)
-        OPTIONAL MATCH (a)-[:OFFERS]->(offer3)
-        WHERE offer3.name = need3.name
-
-        WITH a, b, c,
-             need1.name AS a_needs, offer1.name AS b_gives,
-             need2.name AS b_needs, offer2.name AS c_gives,
-             CASE WHEN offer3 IS NOT NULL THEN need3.name ELSE null END AS c_needs_from_a,
-             CASE WHEN offer3 IS NOT NULL THEN 1.0 ELSE 0.5 END AS loop_strength
-
-        RETURN
-            {id: b.id, name: b.name, role: b.role} AS person_b,
-            {id: c.id, name: c.name, role: c.role} AS person_c,
-            a_needs, b_gives, b_needs, c_gives, c_needs_from_a,
-            loop_strength
-        ORDER BY loop_strength DESC
+        MATCH (a:Person {id: $user_id})-[:ASKS_FOR]->(n1)<-[:OFFERS]-(b:Person)
+        WHERE b.id <> a.id
+        
+        MATCH (b)-[:ASKS_FOR]->(n2)<-[:OFFERS]-(c:Person)
+        WHERE c.id <> a.id AND c.id <> b.id
+        
+        MATCH (c)-[:ASKS_FOR]->(n3)<-[:OFFERS]-(a)
+        
+        WITH a, b, c, n1, n2, n3
+        
+        // Loop Strength: base 1.0, + shared communities
+        OPTIONAL MATCH (a)-[:MEMBER_OF]->(comm)<-[:MEMBER_OF]-(b)
+        OPTIONAL MATCH (b)-[:MEMBER_OF]->(comm2)<-[:MEMBER_OF]-(c)
+        OPTIONAL MATCH (c)-[:MEMBER_OF]->(comm3)<-[:MEMBER_OF]-(a)
+        
+        WITH a, b, c, n1, n2, n3,
+             count(DISTINCT comm) + count(DISTINCT comm2) + count(DISTINCT comm3) AS common_comms
+             
+        RETURN 
+            [{id: a.id, name: a.name, role: a.role, contribution: n3.name},
+             {id: b.id, name: b.name, role: b.role, contribution: n1.name},
+             {id: c.id, name: c.name, role: c.role, contribution: n2.name}] AS members,
+            "Value Loop: " + n3.name + " -> " + n1.name + " -> " + n2.name AS why,
+            1.0 + (common_comms * 0.1) AS strength,
+            "You receive expertise in " + n3.name + " from " + c.name AS direct,
+            "You provide " + n3.name + " utility to the group" AS indirect
+        ORDER BY strength DESC
         LIMIT 5
         """
         with self.driver.session() as session:
@@ -175,17 +191,11 @@ class Neo4jClient:
             circles = []
             for record in result:
                 circles.append({
-                    "person_b": dict(record["person_b"]),
-                    "person_c": dict(record["person_c"]),
-                    "flow": {
-                        "you_need": record["a_needs"],
-                        "b_provides": record["b_gives"],
-                        "b_needs": record["b_needs"],
-                        "c_provides": record["c_gives"],
-                        "c_needs_from_you": record["c_needs_from_a"],
-                    },
-                    "is_full_loop": record["c_needs_from_a"] is not None,
-                    "loop_strength": record["loop_strength"],
+                    "members": record["members"],
+                    "why_this_circle": record["why"],
+                    "loop_strength": round(record["strength"], 2),
+                    "direct_value": record["direct"],
+                    "indirect_value": record["indirect"]
                 })
             return circles
 
@@ -225,45 +235,59 @@ class Neo4jClient:
     # 5. TOP RECOMMENDATIONS — personalized PageRank-style ranking
     # ------------------------------------------------------------------
     def get_top_recommendations(self, user_id: str, limit: int = 5) -> list:
-        """
-        Rank all other attendees by combined score:
-        complementarity + shared context + bridge value.
-        """
+        """Rank all other attendees by strategic graph alignment."""
         query = """
         MATCH (me:Person {id: $user_id})
+        MATCH (other:Person) WHERE other.id <> me.id
 
-        // Find all other people
-        MATCH (other:Person)
-        WHERE other.id <> me.id
-
-        // Complementarity: they offer what I need
+        // Signal 1: Complementarity (Asks/Offers)
         OPTIONAL MATCH (me)-[:ASKS_FOR]->(need)<-[:OFFERS]-(other)
-        WITH me, other, count(DISTINCT need) AS complementarity
-
-        // Shared interests
+        WITH me, other, collect(DISTINCT need.name) AS needs
+        
+        // Signal 2: Topics
         OPTIONAL MATCH (me)-[:INTERESTED_IN]->(t:Topic)<-[:INTERESTED_IN]-(other)
-        WITH me, other, complementarity, count(DISTINCT t) AS shared_topics
-
-        // Shared events
+        WITH me, other, needs, collect(DISTINCT t.name) AS topics
+        
+        // Signal 3: Events
         OPTIONAL MATCH (me)-[:ATTENDED]->(e:PastEvent)<-[:ATTENDED]-(other)
-        WITH me, other, complementarity, shared_topics, count(DISTINCT e) AS shared_events
-
-        // Path distance (shorter = easier intro)
+        WITH me, other, needs, topics, collect(DISTINCT e.name) AS events
+        
+        // Signal 4: Universities
+        OPTIONAL MATCH (me)-[:WENT_TO]->(u:University)<-[:WENT_TO]-(other)
+        WITH me, other, needs, topics, events, collect(DISTINCT u.name) AS unis
+        
+        // Signal 5: Communities
+        OPTIONAL MATCH (me)-[:MEMBER_OF]->(c:Community)<-[:MEMBER_OF]-(other)
+        WITH me, other, needs, topics, events, unis, collect(DISTINCT c.name) AS comms
+        
+        // Signal 6: Path Distance
         OPTIONAL MATCH path = shortestPath((me)-[:CONNECTED_TO*..4]-(other))
-        WITH me, other, complementarity, shared_topics, shared_events,
-             CASE WHEN path IS NOT NULL THEN length(path) ELSE 99 END AS distance
-
-        // Composite score
+        WITH me, other, needs, topics, events, unis, comms,
+             CASE WHEN path IS NOT NULL THEN length(path) ELSE 99 END AS dist
+        
+        // Final Scoring logic
         WITH other,
-             (complementarity * 25 + shared_topics * 15 + shared_events * 20 +
-              CASE WHEN distance <= 2 THEN 30 WHEN distance <= 3 THEN 15 ELSE 0 END
-             ) AS match_score,
-             complementarity, shared_topics, shared_events, distance
-
-        WHERE match_score > 0
-        RETURN other.id AS id, other.name AS name, other.role AS role,
-               other.company AS company, match_score,
-               complementarity, shared_topics, shared_events, distance
+             (size(needs) * 30 + size(topics) * 15 + size(events) * 10 + 
+              size(unis) * 20 + size(comms) * 12 +
+              CASE WHEN dist <= 2 THEN 35 WHEN dist <= 3 THEN 15 ELSE 0 END
+             ) AS score,
+             needs, topics, events, unis, comms, dist
+        
+        WHERE score > 0
+        RETURN other.id AS id, other.name AS name, other.role AS role, 
+               other.company AS company, score AS match_score,
+               size(needs) AS complementarity, size(topics) AS shared_topics,
+               size(events) AS shared_events, size(unis) AS shared_universities,
+               size(comms) AS shared_communities, dist AS distance,
+               CASE 
+                 WHEN size(needs) > 0 THEN "Offers exactly what you need"
+                 WHEN dist = 2 THEN "Intro possible via mutual connection"
+                 WHEN size(unis) > 0 THEN "Fellow " + unis[0] + " alumni"
+                 WHEN size(topics) > 0 THEN "Shared interest in " + topics[0]
+                 WHEN size(events) > 0 THEN "Both attended " + events[0]
+                 WHEN size(comms) > 0 THEN "Part of " + comms[0]
+                 ELSE "Strong serendipity signal"
+               END AS short_reason
         ORDER BY match_score DESC
         LIMIT $limit
         """
