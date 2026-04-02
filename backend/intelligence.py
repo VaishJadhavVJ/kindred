@@ -10,8 +10,8 @@ import logging
 import re
 from typing import Optional
 
-from app.neo4j_client import Neo4jClient
-from app.rocketride_client import RocketRideClient
+from backend.neo4j_client import Neo4jClient
+from backend.rocketride_client import RocketRideClient
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,92 @@
+{
+  "components": [
+    {
+      "id": "llm_gemini_1",
+      "provider": "llm_gemini",
+      "config": {
+        "profile": "gemini-2_5-flash",
+        "gemini-3-pro": {},
+        "parameters": {
+          "google": {}
+        },
+        "gemini-2_5-flash": {
+          "apikey": "AIzaSyAabADjVpLSpM1yhCEkA7mcSxv7Eh5ftTo"
+        }
+      },
+      "ui": {
+        "position": {
+          "x": 863.8018223871675,
+          "y": 410.1072420590122
+        },
+        "measured": {
+          "width": 150,
+          "height": 88
+        },
+        "nodeType": "default",
+        "formDataValid": true
+      },
+      "input": [
+        {
+          "lane": "questions",
+          "from": "chat_1"
+        }
+      ]
+    },
+    {
+      "id": "chat_1",
+      "provider": "chat",
+      "config": {
+        "hideForm": true,
+        "mode": "Source",
+        "parameters": {},
+        "type": "chat"
+      },
+      "ui": {
+        "position": {
+          "x": 629.3473711163563,
+          "y": 389.37796930452123
+        },
+        "measured": {
+          "width": 150,
+          "height": 126
+        },
+        "nodeType": "default",
+        "formDataValid": true
+      }
+    },
+    {
+      "id": "response_answers_1",
+      "provider": "response_answers",
+      "config": {
+        "laneName": "answers"
+      },
+      "ui": {
+        "position": {
+          "x": 1054.846483598004,
+          "y": 427.43196029107304
+        },
+        "measured": {
+          "width": 150,
+          "height": 66
+        },
+        "nodeType": "default",
+        "formDataValid": true
+      },
+      "input": [
+        {
+          "lane": "answers",
+          "from": "llm_gemini_1"
+        }
+      ]
+    }
+  ],
+  "project_id": "162b9781-2770-4aee-9530-8b624f706a4d",
+  "viewport": {
+    "x": -582.1487485070566,
+    "y": -211.52576107530223,
+    "zoom": 1.1786584507813953
+  },
+  "version": 1,
+  "docRevision": 36,
+  "source": "chat_1"
+}

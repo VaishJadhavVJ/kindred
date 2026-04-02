@@ -13,11 +13,11 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.config import get_settings, setup_logging
-from app.neo4j_client import Neo4jClient
-from app.rocketride_client import RocketRideClient
-from app.intelligence import IntelligenceEngine
-from app.openai_client import OpenAIClient
+from backend.config import get_settings, setup_logging
+from backend.neo4j_client import Neo4jClient
+from backend.rocketride_client import RocketRideClient
+from backend.intelligence import IntelligenceEngine
+from backend.openai_client import OpenAIClient
 
 neo4j_client: Optional[Neo4jClient] = None
 intel_engine: Optional[IntelligenceEngine] = None
@@ -81,7 +81,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-from app.schemas import (
+from backend.schemas import (
     HealthResponse, MatchRequest, MatchResponse, 
     IcebreakerResponse, FollowUpRequest, FollowUpResponse, 
     VoiceCaptureResponse, MicroCircleRequest, MicroCircleResponse,
