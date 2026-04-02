@@ -1,0 +1,37 @@
+{
+  "_comment": "RocketRide Pipeline — Kindred Whisper Transcription",
+  "_instructions": [
+    "1. In VS Code RocketRide extension, create new pipeline",
+    "2. Add nodes: Webhook Source → Whisper Audio Node → Output",
+    "3. The FastAPI backend sends base64 audio to this pipeline",
+    "4. Whisper node transcribes and returns text"
+  ],
+  "name": "kindred_whisper",
+  "description": "Transcribes voice notes from event conversations",
+  "nodes": {
+    "source": {
+      "type": "webhook",
+      "config": {
+        "port": 5565,
+        "path": "/pipeline/kindred_whisper"
+      }
+    },
+    "transcribe": {
+      "type": "whisper",
+      "config": {
+        "model": "whisper-1",
+        "language": "en"
+      }
+    },
+    "output": {
+      "type": "output",
+      "config": {
+        "format": "text"
+      }
+    }
+  },
+  "lanes": [
+    {"from": "source", "to": "transcribe"},
+    {"from": "transcribe", "to": "output"}
+  ]
+}

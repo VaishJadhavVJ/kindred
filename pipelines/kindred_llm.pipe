@@ -1,0 +1,42 @@
+{
+  "_comment": "RocketRide Pipeline — Kindred LLM Reasoning",
+  "_comment2": "Load this in the RocketRide VS Code extension. Wire: Webhook Source → OpenAI LLM Node → Output",
+  "_instructions": [
+    "1. Open VS Code with RocketRide extension installed",
+    "2. Create a new pipeline from the visual builder",
+    "3. Add nodes: Webhook Source → OpenAI Chat → Output",
+    "4. Configure the OpenAI node with your API key",
+    "5. Set the webhook source to accept JSON input",
+    "6. The FastAPI backend sends {system, user} JSON to this pipeline",
+    "7. Deploy locally or via Docker on port 5565"
+  ],
+  "name": "kindred_llm",
+  "description": "Processes graph context + user query through LLM for icebreakers and follow-ups",
+  "nodes": {
+    "source": {
+      "type": "webhook",
+      "config": {
+        "port": 5565,
+        "path": "/pipeline/kindred_llm"
+      }
+    },
+    "llm": {
+      "type": "openai_chat",
+      "config": {
+        "model": "gpt-4o-mini",
+        "temperature": 0.8,
+        "max_tokens": 800
+      }
+    },
+    "output": {
+      "type": "output",
+      "config": {
+        "format": "json"
+      }
+    }
+  },
+  "lanes": [
+    {"from": "source", "to": "llm"},
+    {"from": "llm", "to": "output"}
+  ]
+}
