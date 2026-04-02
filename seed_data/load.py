@@ -428,6 +428,7 @@ def seed_relationships(session):
     communities = {
         "you": ["GDSC UIC", "Chicago AI Builders", "YC Startup School"],
         "sam": ["Chicago AI Builders"],
+        "alex": ["YC Startup School", "Chicago AI Builders"],
         "priya": ["Chicago AI Builders", "Women in AI Chicago"],
         "lisa": ["Neo4j Community", "Chicago AI Builders"],
         "raj": ["Indie Hackers Chicago", "YC Startup School"],
@@ -447,6 +448,7 @@ def seed_relationships(session):
         "you": ["Find internship", "Get funding advice", "Find cofounder"],
         "rhea": ["Hire AI engineers", "Get funding advice"],
         "raj": ["Find open source collaborators"],
+        "alex": ["Learn MLOps"],
         "kevin": ["Find internship"],
         "david": ["Learn MLOps"],
         "tom": ["Find internship", "Find mentor"],
@@ -472,6 +474,7 @@ def seed_relationships(session):
         "arjun": ["Find mentor"],
         "jake": ["Get funding advice", "Find cofounder"],
         "lena": ["Find internship"],
+        "alex": ["Find open source collaborators"],
     }
     for pid, offer_list in offers.items():
         for o in offer_list:

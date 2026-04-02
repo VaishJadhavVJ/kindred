@@ -33,29 +33,83 @@
 ```bash
 cd kindred
 pip install -r requirements.txt
-# Set environment variables (see .env.example)
+cp .env.example .env
+# Edit .env with your credentials (Neo4j, OpenAI)
 uvicorn app.main:app --reload --port 8000
 ```
 
 ## Environment Variables
 
 ```
+# Neo4j AuraDB (free tier) - Required
 NEO4J_URI=neo4j+s://xxxxx.databases.neo4j.io
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_password
-OPENAI_API_KEY=sk-...              # For Whisper + fallback LLM
-ROCKETRIDE_URI=http://localhost:5565  # Optional: if RR engine running
+
+# RocketRide Engine (Docker on localhost) - Optional layer
+ROCKETRIDE_URI=http://localhost:5565
+
+# OpenAI Fallback - Required if RocketRide is offline
+OPENAI_API_KEY=sk-...
+
+# Application Settings
+LOG_LEVEL=INFO
 ```
 
-## Team Roles
+## Seeding the Database (Demo Graph)
+The project comes with a highly realistic 50-person graph (connected via Topics, Events, Roles, and Asks/Offers). To populate your Neo4j database:
 
-- **Backend Lead**: Neo4j AuraDB setup + seed data (`python -m seed_data.load`)
-- **Intelligence Layer (Vaishnavi)**: This FastAPI app + RocketRide pipeline
-- **PM/Frontend**: Next.js consuming the API endpoints above
+```bash
+python3 -m seed_data.load
+```
+*Note: This command will cleanly clear the existing database, create constraints, and generate roughly 50 connected nodes with detailed serendipity mappings.*
 
-## Demo Script (4:30 PM Golden Path)
+## Testing & Reliability
+The project includes a full test suite for reliability:
 
-1. Open app → select target "Nina"
-2. GET `/api/recommend/nina` → shows warm path + serendipity score
-3. Click record → POST `/api/voice-capture` with audio
-4. App displays: icebreaker for Alex + 3 follow-up variants for Priya
+### 1. Unit & API Tests (Mocked)
+Fast, stable tests that verify logic and routing without needing external services:
+```bash
+pytest tests/
+```
+
+### 2. Integration Tests (Real Data)
+Verifies the end-to-end product flow against your seeded Neo4j instance:
+```bash
+python3 test_integration.py
+```
+
+## The 5-Minute Backend Demo
+
+Kindred is a "Product-First" engine. You can run a full narrative demo that simulates a real event journey (Vaishnavi's arrival at the UIC ML Symposium) without needing a frontend:
+
+1.  **Seed the Graph**:
+    ```bash
+    python3 -m seed_data.load
+    ```
+2.  **Run the Narrative Demo**:
+    ```bash
+    python3 scripts/demo_engine.py
+    ```
+
+### What the Demo Exercises:
+- **Step 1: Health Check**: Verifies Neo4j connectivity and Intelligence Mode (RocketRide vs. OpenAI Fallback).
+- **Step 2: Recommendation**: Ranks the top 5 strategic matches for Vaishnavi based on her "Asks" (e.g., *Find cofounder*).
+- **Step 3: Targeted Match**: Finds a **Warm Intro Path** and **Serendipity Score** for Nina Patel.
+- **Step 4: Grounded Icebreaker**: Synthesizes a fact-grounded greeting for Nina based on shared interests in *Knowledge Graphs*.
+- **Step 5: Micro-Circle Discovery**: Finds a 3-person "Value Loop" between Vaishnavi, Raj, and Alex.
+- **Step 6: Smart Follow-ups**: Generates professional and casual follow-up variants for the morning after.
+
+## Reliability & Verification
+
+The engine is protected by 21+ automated tests covering graph logic, prompt grounding, and API contracts:
+
+```bash
+pytest tests/
+```
+
+## Team Integration
+
+- **Backend / Graph**: Managed via `app/neo4j_client.py` and `seed_data/load.py`.
+- **Intelligence Layer**: Orchestrated by `app/intelligence.py` using RocketRide or OpenAI.
+- **Frontend (Next.js)**: Consumes the REST API defined in `app/main.py` using the schemas in `app/schemas.py`.
