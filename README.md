@@ -1,61 +1,36 @@
-# Project Kindred — Event Networking Intelligence Engine
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Architecture
+## Getting Started
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Next.js Frontend (PM)                 │
-│         Antigravity + 21st.dev components                │
-└──────────────────────┬──────────────────────────────────┘
-                       │  REST API calls
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│               FastAPI Backend (This Code)                │
-│                                                          │
-│  POST /api/match          → Warm path + serendipity      │
-│  POST /api/icebreaker     → Graph-explained icebreaker   │
-│  POST /api/followup       → Tri-variant follow-ups       │
-│  POST /api/voice-capture  → Voice→text→graph→insights    │
-│  POST /api/micro-circle   → Triangular match finder      │
-│  GET  /api/recommend/{id} → Full recommendation payload  │
-└────────┬──────────────────────────┬─────────────────────┘
-         │                          │
-         ▼                          ▼
-┌─────────────────┐    ┌──────────────────────────┐
-│   Neo4j AuraDB  │    │   RocketRide AI Engine    │
-│  (Graph Queries) │    │  (Pipeline: voice→LLM→out)│
-│   50-node demo   │    │  Fallback: direct OpenAI  │
-└─────────────────┘    └──────────────────────────┘
-```
-
-## Quick Start
+First, run the development server:
 
 ```bash
-cd kindred
-pip install -r requirements.txt
-# Set environment variables (see .env.example)
-uvicorn app.main:app --reload --port 8000
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-## Environment Variables
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-```
-NEO4J_URI=neo4j+s://xxxxx.databases.neo4j.io
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password
-OPENAI_API_KEY=sk-...              # For Whisper + fallback LLM
-ROCKETRIDE_URI=http://localhost:5565  # Optional: if RR engine running
-```
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## Team Roles
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-- **Backend Lead**: Neo4j AuraDB setup + seed data (`python -m seed_data.load`)
-- **Intelligence Layer (Vaishnavi)**: This FastAPI app + RocketRide pipeline
-- **PM/Frontend**: Next.js consuming the API endpoints above
+## Learn More
 
-## Demo Script (4:30 PM Golden Path)
+To learn more about Next.js, take a look at the following resources:
 
-1. Open app → select target "Nina"
-2. GET `/api/recommend/nina` → shows warm path + serendipity score
-3. Click record → POST `/api/voice-capture` with audio
-4. App displays: icebreaker for Alex + 3 follow-up variants for Priya
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
